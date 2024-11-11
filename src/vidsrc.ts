@@ -11,7 +11,7 @@ import * as cheerio from "npm:cheerio"; // FOR DENO
 import * as cheerio from "cheerio";
 import { decrypt } from "./helpers/decoder";
 
-let BASEDOM = "https://whisperingauroras.com";
+let BASEDOM = "";
 
 interface Servers {
   name: string | null;
@@ -30,6 +30,17 @@ interface RCPResponse {
   };
   data: string;
 }
+
+async function getBaseDomain(html: string): Promise<{ origin: string }> {
+  const $ = cheerio.load(html);
+  // find element with this id player_iframe
+  const iframe = $("#player_iframe").attr("src") ?? "";
+  const domain = new URL(iframe.startsWith("//") ? "https:" + iframe : iframe).origin;
+  return {
+    origin: domain,
+  };
+}
+
 async function serversLoad(html: string): Promise<{ servers: Servers[]; title: string }> {
   const $ = cheerio.load(html);
   const servers: Servers[] = [];
@@ -48,8 +59,10 @@ async function serversLoad(html: string): Promise<{ servers: Servers[]; title: s
     title: title,
   };
 }
+
 async function SRCRCPhandler() {
 }
+
 async function PRORCPhandler(prorcp: string): Promise<string | null> {
   const prorcpFetch = await fetch(`${BASEDOM}/prorcp/${prorcp}`);
   const prorcpResponse = await prorcpFetch.text();
@@ -110,6 +123,10 @@ async function tmdbScrape(tmdbId: string, type: "movie" | "tv", season?: number,
     : `https://vidsrc.net/embed/${type}?tmdb=${tmdbId}&season=${season}&episode=${episode}`;
   const embed = await fetch(url);
   const embedResp = await embed.text();
+
+  const baseDomain = await getBaseDomain(embedResp);
+
+  BASEDOM = baseDomain.origin;
 
   // get some metadata
   const { servers, title } = await serversLoad(embedResp);
